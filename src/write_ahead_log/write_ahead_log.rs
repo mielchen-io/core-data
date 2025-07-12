@@ -2,7 +2,7 @@ use std::io::{Error, SeekFrom};
 
 pub trait WriteAheadLog {
 
-    fn read(&mut self) -> Result<Vec<u8>, Error>;
+    fn read(&mut self, size: u64) -> Result<Vec<u8>, Error>;
 
     fn write(&mut self, buf: Vec<u8>) -> Result<(), Error>;
 
