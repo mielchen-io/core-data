@@ -1,2 +1,2 @@
 pub mod write_ahead_log;
-pub mod segment_wal;
+pub mod copy_wal;
