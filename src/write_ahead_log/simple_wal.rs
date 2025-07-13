@@ -78,6 +78,9 @@ impl SimpleWal {
         meta_file.write_all(&META_FILE_SIGNATURE)
             .expect("Failed to write meta file signature");
 
+        meta_file.write_all(&[0; 32]) // 32 bytes of zeros for the operational file indicator
+            .expect("Failed to write operational file indicator");
+
         Self {
             tick_file,
             tock_file,
@@ -163,10 +166,16 @@ impl WriteAheadLog for SimpleWal {
             .stream_position()
             .expect("Failed to get stream position");
         self.write_log_entry(stream_pos, &buf);
+        self.log_file
+            .sync_all()
+            .expect("Failed to sync log file");
         // 2. Then the data is written to the current operational file.
         self.get_current_operational_file()
             .write_all(buf.as_slice())
             .expect("Failed to write data to operational file");
+        self.get_current_operational_file()
+            .sync_all()
+            .expect("Failed to sync operational file");
         Ok(())
     }
 
@@ -196,13 +205,69 @@ impl WriteAheadLog for SimpleWal {
     }
 
     fn atomic_checkpoint(&mut self) -> Result<(), std::io::Error> {
-        //seek to the beginning of the meta file
+        // 1. The current operational file in wal.meta is switched to the fallback.
         self.meta_file
             .seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek in meta file");
-        //c
-
-
+        // first read the signature to check if it is a real meta file
+        let mut signature: [u8; 32] = [0; 32];
+        self.meta_file
+            .read_exact(&mut signature)
+            .expect("Failed to read meta file signature");
+        // Check if the signature matches
+        assert!(signature.starts_with(&WAL_SIGNATURE) && signature[24..32] == META_FILE_SIGNATURE,
+            "Invalid meta file signature");
+        // then read the current operational file indicator and switch it
+        let mut operational_file_indicator = [0u8; 32];
+        self.meta_file
+            .read_exact(&mut operational_file_indicator)
+            .expect("Failed to read operational file indicator");
+        if operational_file_indicator.iter().all(|&x| x == 0) {
+            operational_file_indicator.fill(1);
+        } else if operational_file_indicator.iter().all(|&x| x == 1) {
+            operational_file_indicator.fill(0);
+        } else {
+            panic!("Invalid operational file indicator");
+        }
+        self.meta_file
+            .seek(std::io::SeekFrom::Start(0))
+            .expect("Failed to seek in meta file");
+        self.meta_file
+            .write_all(&WAL_SIGNATURE)
+            .expect("Failed to write meta file signature");
+        self.meta_file
+            .write_all(&META_FILE_SIGNATURE)
+            .expect("Failed to write meta file signature");
+        self.meta_file
+            .write_all(&operational_file_indicator)
+            .expect("Failed to write operational file indicator");
+        self.meta_file
+            .sync_all()
+            .expect("Failed to sync meta file");
+        // 2. Iterate over the log file and apply all log entries to the new operational file.
+        self.log_file
+            .seek(std::io::SeekFrom::Start(0))
+            .expect("Failed to seek in log file");
+        while self.log_file.stream_position().unwrap() < self.log_file.metadata().unwrap().len() {
+            let (stream_pos, data) = self.read_log_entry();
+            // Write the data to the current operational file at the correct position
+            self.get_current_operational_file()
+                .seek(std::io::SeekFrom::Start(stream_pos))
+                .expect("Failed to seek in operational file");
+            self.get_current_operational_file()
+                .write_all(&data)
+                .expect("Failed to write data to operational file");
+        }
+        self.get_current_operational_file()
+            .sync_all()
+            .expect("Failed to sync operational file");
+        // 3. Erase all log entries in the log file.
+        self.log_file
+            .set_len(0)
+            .expect("Failed to erase log file");
+        self.log_file
+            .sync_all()
+            .expect("Failed to sync log file");
         Ok(())
     }
 }
