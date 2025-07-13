@@ -22,12 +22,6 @@ use std::{io::{Read, Seek, Write}, path::PathBuf};
 
 use crate::write_ahead_log::write_ahead_log::WriteAheadLog;
 
-const WAL_SIGNATURE: [u8; 24] = *b"SIMPLE_WAL_2025_7_13____";
-const TOCK_FILE_SIGNATURE: [u8; 8] = *b"TOCK____";
-const TICK_FILE_SIGNATURE: [u8; 8] = *b"TICK____";
-const LOG_FILE_SIGNATURE: [u8; 8] = *b"LOG_____";
-const META_FILE_SIGNATURE: [u8; 8] = *b"META____";
-
 pub struct SimpleWal {
     tick_file: std::fs::File,
     tock_file: std::fs::File,
@@ -43,40 +37,16 @@ impl SimpleWal {
         assert!(dir_path.read_dir().expect("Could not read directory").next().is_none(), "Directory is not empty: {:?}", dir_path);
 
         let tick_file_path = dir_path.join("wal.tick");
-        let mut tick_file = std::fs::File::create(&tick_file_path)
-            .expect("Failed to create tick file");
+        let tick_file = create_file_with_permissions(&tick_file_path);
 
         let tock_file_path = dir_path.join("wal.tock");
-        let mut tock_file = std::fs::File::create(&tock_file_path)
-            .expect("Failed to create tock file");
+        let tock_file = create_file_with_permissions(&tock_file_path);
 
         let log_file_path = dir_path.join("wal.log");
-        let mut log_file = std::fs::File::create(&log_file_path)
-            .expect("Failed to create log file");
+        let log_file = create_file_with_permissions(&log_file_path);
 
         let meta_file_path = dir_path.join("wal.meta");
-        let mut meta_file = std::fs::File::create(&meta_file_path)
-            .expect("Failed to create meta file");
-
-        tick_file.write_all(&WAL_SIGNATURE)
-            .expect("Failed to write tick file signature");
-        tick_file.write_all(&TICK_FILE_SIGNATURE)
-            .expect("Failed to write tick file signature");
-
-        tock_file.write_all(&WAL_SIGNATURE)
-            .expect("Failed to write tock file signature");
-        tock_file.write_all(&TOCK_FILE_SIGNATURE)
-            .expect("Failed to write tock file signature");
-
-        log_file.write_all(&WAL_SIGNATURE)
-            .expect("Failed to write log file signature");
-        log_file.write_all(&LOG_FILE_SIGNATURE)
-            .expect("Failed to write log file signature");
-
-        meta_file.write_all(&WAL_SIGNATURE)
-            .expect("Failed to write meta file signature");
-        meta_file.write_all(&META_FILE_SIGNATURE)
-            .expect("Failed to write meta file signature");
+        let mut meta_file = create_file_with_permissions(&meta_file_path)
 
         meta_file.write_all(&[0; 32]) // 32 bytes of zeros for the operational file indicator
             .expect("Failed to write operational file indicator");
@@ -88,22 +58,14 @@ impl SimpleWal {
             meta_file,
         }
     }
+
     
+
     fn get_current_operational_file(&mut self) -> &std::fs::File {
-        // Seek to the beginning of the meta file
         self.meta_file
             .seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek in meta file");
 
-        // Read 32 bytes to check if it is a real meta file
-        let mut signature : [u8; 32] = [0; 32];
-        self.meta_file
-            .read_exact(&mut signature)
-            .expect("Failed to read meta file signature");
-        // Check if the signature matches
-        assert!(signature.starts_with(&WAL_SIGNATURE) && signature[24..32] == META_FILE_SIGNATURE,
-            "Invalid meta file signature");
-        // Read the next 32 bytes to determine the current operational file: all zeros means tick file, all ones means tock file
         let mut operational_file_indicator: [u8; 32] = [0; 32];
         self.meta_file
             .read_exact(&mut operational_file_indicator)
@@ -149,7 +111,6 @@ impl SimpleWal {
 
         (stream_pos, data)
     }
-
 }
 
 impl WriteAheadLog for SimpleWal {
@@ -161,7 +122,6 @@ impl WriteAheadLog for SimpleWal {
     }
 
     fn write(&mut self, buf: Vec<u8>) -> Result<(), std::io::Error> {
-        // 1. A log entry is created and written to the log file.
         let stream_pos = self.get_current_operational_file()
             .stream_position()
             .expect("Failed to get stream position");
@@ -169,7 +129,6 @@ impl WriteAheadLog for SimpleWal {
         self.log_file
             .sync_all()
             .expect("Failed to sync log file");
-        // 2. Then the data is written to the current operational file.
         self.get_current_operational_file()
             .write_all(buf.as_slice())
             .expect("Failed to write data to operational file");
@@ -205,19 +164,6 @@ impl WriteAheadLog for SimpleWal {
     }
 
     fn atomic_checkpoint(&mut self) -> Result<(), std::io::Error> {
-        // 1. The current operational file in wal.meta is switched to the fallback.
-        self.meta_file
-            .seek(std::io::SeekFrom::Start(0))
-            .expect("Failed to seek in meta file");
-        // first read the signature to check if it is a real meta file
-        let mut signature: [u8; 32] = [0; 32];
-        self.meta_file
-            .read_exact(&mut signature)
-            .expect("Failed to read meta file signature");
-        // Check if the signature matches
-        assert!(signature.starts_with(&WAL_SIGNATURE) && signature[24..32] == META_FILE_SIGNATURE,
-            "Invalid meta file signature");
-        // then read the current operational file indicator and switch it
         let mut operational_file_indicator = [0u8; 32];
         self.meta_file
             .read_exact(&mut operational_file_indicator)
@@ -230,27 +176,17 @@ impl WriteAheadLog for SimpleWal {
             panic!("Invalid operational file indicator");
         }
         self.meta_file
-            .seek(std::io::SeekFrom::Start(0))
-            .expect("Failed to seek in meta file");
-        self.meta_file
-            .write_all(&WAL_SIGNATURE)
-            .expect("Failed to write meta file signature");
-        self.meta_file
-            .write_all(&META_FILE_SIGNATURE)
-            .expect("Failed to write meta file signature");
-        self.meta_file
             .write_all(&operational_file_indicator)
             .expect("Failed to write operational file indicator");
         self.meta_file
             .sync_all()
             .expect("Failed to sync meta file");
-        // 2. Iterate over the log file and apply all log entries to the new operational file.
+
         self.log_file
             .seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek in log file");
         while self.log_file.stream_position().unwrap() < self.log_file.metadata().unwrap().len() {
             let (stream_pos, data) = self.read_log_entry();
-            // Write the data to the current operational file at the correct position
             self.get_current_operational_file()
                 .seek(std::io::SeekFrom::Start(stream_pos))
                 .expect("Failed to seek in operational file");
@@ -261,7 +197,7 @@ impl WriteAheadLog for SimpleWal {
         self.get_current_operational_file()
             .sync_all()
             .expect("Failed to sync operational file");
-        // 3. Erase all log entries in the log file.
+
         self.log_file
             .set_len(0)
             .expect("Failed to erase log file");
@@ -270,4 +206,13 @@ impl WriteAheadLog for SimpleWal {
             .expect("Failed to sync log file");
         Ok(())
     }
+}
+
+fn create_file_with_permissions(path: &PathBuf) -> std::fs::File {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .expect("Failed to create one of the WAL files")
 }
