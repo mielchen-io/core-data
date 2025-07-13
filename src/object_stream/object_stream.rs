@@ -31,4 +31,6 @@ pub trait ObjectStream {
 
     /// Delete the current and all following objects.
     fn cut(&mut self) -> Result<(), Error>;
+
+    fn checkpoint(&mut self) -> Result<(), Error>;
 }
