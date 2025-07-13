@@ -1,4 +1,4 @@
-use core_data::write_ahead_log::copy_wal::{CopyWal};
+use core_data::write_ahead_log::simple_wal::{SimpleWal};
 
 #[test]
 fn test_segment_wal() {
