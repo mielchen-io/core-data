@@ -169,7 +169,7 @@ impl WriteAheadLog for SimpleWal {
         Ok(buffer)
     }
 
-    fn write(&mut self, buf: Vec<u8>) -> Result<(), std::io::Error> {
+    fn write(&mut self, buf: Vec<u8>){
         // 1. A log entry is created and written to the log file
         let stream_pos = self.get_current_operational_file()
             .stream_position()
@@ -186,7 +186,6 @@ impl WriteAheadLog for SimpleWal {
         self.get_current_operational_file()
             .sync_all()
             .expect("Failed to sync operational file");
-        Ok(())
     }
 
     fn seek(&mut self, pos: std::io::SeekFrom) -> Result<(), std::io::Error> {
@@ -208,7 +207,7 @@ impl WriteAheadLog for SimpleWal {
         Ok(pos)
     }
 
-    fn set_len(&mut self, size: u64) -> Result<(), std::io::Error> {
+    fn set_len(&mut self, size: u64){
         // 1. A log entry is created and written to the log file
         let log_entry = LogEntry::SetLen(size);
         self.write_log_entry(&log_entry);
@@ -222,10 +221,9 @@ impl WriteAheadLog for SimpleWal {
         self.get_current_operational_file()
             .sync_all()
             .expect("Failed to sync operational file");
-        Ok(())
     }
 
-    fn atomic_checkpoint(&mut self) -> Result<(), std::io::Error> {
+    fn atomic_checkpoint(&mut self){
         let mut operational_file_indicator = [0u8; 32];
         self.meta_file
             .seek(std::io::SeekFrom::Start(0))
@@ -283,7 +281,6 @@ impl WriteAheadLog for SimpleWal {
         self.log_file
             .sync_all()
             .expect("Failed to sync log file");
-        Ok(())
     }
 }
 

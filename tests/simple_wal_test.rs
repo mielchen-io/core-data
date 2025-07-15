@@ -55,7 +55,7 @@ fn test_read() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![1, 2, 3, 4]).expect("write failed");
+    wal.write(vec![1, 2, 3, 4]);
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
     let data = wal.read(4).expect("read failed");
 
@@ -69,7 +69,7 @@ fn test_write() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![5, 6, 7, 8]).expect("write failed");
+    wal.write(vec![5, 6, 7, 8]);
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
     let data = wal.read(4).expect("read failed");
 
@@ -83,7 +83,7 @@ fn test_seek() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![9, 10, 11, 12]).expect("write failed");
+    wal.write(vec![9, 10, 11, 12]);
     wal.seek(SeekFrom::Start(2)).expect("seek failed");
     let data = wal.read(2).expect("read failed");
 
@@ -97,7 +97,7 @@ fn test_stream_len() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![13, 14, 15, 16]).expect("write failed");
+    wal.write(vec![13, 14, 15, 16]);
     let len = wal.stream_len().expect("stream_len failed");
 
     assert_eq!(len, 4);
@@ -110,7 +110,7 @@ fn test_stream_position() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![17, 18, 19, 20]).expect("write failed");
+    wal.write(vec![17, 18, 19, 20]);
     wal.seek(SeekFrom::Start(2)).expect("seek failed");
     let pos = wal.stream_position().expect("stream_position failed");
 
@@ -123,8 +123,8 @@ fn test_atomic_checkpoint() {
     let temp_path = temp_dir.path();
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
-    wal.write(vec![21, 22, 23, 24]).expect("write failed");
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.write(vec![21, 22, 23, 24]);
+    wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
     let data = wal.read(4).expect("read failed");
 
@@ -138,19 +138,19 @@ fn test_set_len() {
 
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
-    wal.write(vec![25, 26, 27, 28]).expect("write failed");
+    wal.write(vec![25, 26, 27, 28]);
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 4);
-    wal.set_len(3).expect("set_len failed");
+    wal.set_len(3);
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 3);
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.atomic_checkpoint();
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 3);
-    wal.set_len(2).expect("set_len failed");
+    wal.set_len(2);
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 2);
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.atomic_checkpoint();
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 2);
 }
@@ -160,8 +160,8 @@ fn test_open_wal_at_directory() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
-    wal.write(vec![29, 30, 31, 32]).expect("write failed");
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.write(vec![29, 30, 31, 32]);
+    wal.atomic_checkpoint();
     drop(wal);
     let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
@@ -174,10 +174,10 @@ fn test_recovery_type_a() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
-    wal.write(vec![33, 34, 35, 36]).expect("write failed");
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.write(vec![33, 34, 35, 36]);
+    wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    wal.write(vec![37, 38, 39, 40]).expect("write failed");
+    wal.write(vec![37, 38, 39, 40]);
 
     // Simulate a crash by dropping the wal before the atomic checkpoint wich results in a non empty log file and a recovery type A
     drop(wal);
@@ -194,11 +194,11 @@ fn test_recovery_type_b() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
-    wal.write(vec![41, 42, 43, 44]).expect("write failed");
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.write(vec![41, 42, 43, 44]);
+    wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    wal.write(vec![45, 46, 47, 48]).expect("write failed");
-    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.write(vec![45, 46, 47, 48]);
+    wal.atomic_checkpoint();
     drop(wal);
 
     //now we simulate a crash during the atomic checkpoint by writing the meta file to half ones and half zeros
