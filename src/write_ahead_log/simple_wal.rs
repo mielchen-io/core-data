@@ -15,8 +15,8 @@
 //! After every numbered step, fsync syscall is used to ensure durability.
 //! 
 //! The Recovery Type for each step specifies how a faulty state is detected if the system crashes during this step and how the system can recover from it:
-//! - Recovery Type A: A faulty state is detected when wal.meta contains a valid signature but wal.log is not. The system can recover by erasing the current operational file, generating it again as a copy of the fallback and afterwards erasing the log file. If this process is interrupted by a crash, the same recovery can be performed again.
-//! - Recovery Type B: A faulty state is detected when wal.meta does not contain a valid signature. The system can recover by erasing wal.tick and generating it again as a copy of wal.tock. Then the wal.meta is updated with a new valid signature pointing to wal.tock. If this process is interrupted by a crash, the same recovery can be performed again.
+//! - Recovery Type A: A faulty state is detected when wal.meta contains a valid signature but wal.log is not empty. The system can recover by erasing the current operational file, generating it again as a copy of the fallback and afterwards erasing the log file. If this process is interrupted by a crash, the same recovery can be performed again.
+//! - Recovery Type B: A faulty state is detected when wal.meta does not contain a valid signature. The system can recover by erasing wal.tick and generating it again as a copy of wal.tock. Then the log file is erased. Then the wal.meta is updated with a new valid signature pointing to wal.tock. If this process is interrupted by a crash, recovery is still possible.
 
 use std::{fs::File, io::{Read, Seek, SeekFrom, Write}, path::PathBuf};
 

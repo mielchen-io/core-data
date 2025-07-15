@@ -86,6 +86,9 @@ impl SimpleWal {
                 .write_all(&[1u8; 32])
                 .expect("Failed to write operational file indicator");
             meta_file.sync_all().expect("Failed to sync meta file");
+            // 3. Erase the log file
+            log_file.set_len(0).expect("Failed to erase log file");
+            log_file.sync_all().expect("Failed to sync log file");
         } 
 
         return Self {

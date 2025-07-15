@@ -12,6 +12,20 @@ fn _print_all_file_content(temp_path: &Path){
     println!("wal.meta content: {:?}", meta_content);
 }
 
+fn health_check(temp_path: &Path) {
+    // Check if the log file is empty
+    let log_content = std::fs::read(temp_path.join("wal.log")).expect("failed to read wal.log");
+    assert!(log_content.is_empty(), "wal.log should be empty after recovery");
+    // Check if the meta file is valid
+    let meta_content = std::fs::read(temp_path.join("wal.meta")).expect("failed to read wal.meta");
+    assert_eq!(meta_content.len(), 32, "wal.meta should contain 32 bytes");
+    assert!(meta_content.iter().all(|&x| x == 1) || meta_content.iter().all(|&x| x == 0), "wal.meta should contain all ones or all zeros after recovery");
+    // Check if tick and tock files are identical
+    let tick_content = std::fs::read(temp_path.join("wal.tick")).expect("failed to read wal.tick");
+    let tock_content = std::fs::read(temp_path.join("wal.tock")).expect("failed to read wal.tock");
+    assert_eq!(tick_content, tock_content, "wal.tick and wal.tock should be identical after recovery");
+}
+
 #[test]
 fn test_new_wal_at_directory() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
@@ -140,3 +154,64 @@ fn test_set_len() {
     let len = wal.stream_len().expect("stream_len failed");
     assert_eq!(len, 2);
 }
+
+#[test]
+fn test_open_wal_at_directory() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let temp_path = temp_dir.path();
+    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    wal.write(vec![29, 30, 31, 32]).expect("write failed");
+    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    drop(wal);
+    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    let data = wal.read(4).expect("read failed");
+    assert_eq!(data, vec![29, 30, 31, 32]);
+}
+
+#[test]
+fn test_recovery_type_a() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let temp_path = temp_dir.path();
+    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    wal.write(vec![33, 34, 35, 36]).expect("write failed");
+    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    wal.write(vec![37, 38, 39, 40]).expect("write failed");
+
+    // Simulate a crash by dropping the wal before the atomic checkpoint wich results in a non empty log file and a recovery type A
+    drop(wal);
+    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    health_check(temp_path);
+    // Check if the content matches the checkpoint
+    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    let data = wal.read(4).expect("read failed");
+    assert_eq!(data, vec![33, 34, 35, 36]);
+}
+
+#[test]
+fn test_recovery_type_b() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let temp_path = temp_dir.path();
+    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    wal.write(vec![41, 42, 43, 44]).expect("write failed");
+    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    wal.write(vec![45, 46, 47, 48]).expect("write failed");
+    wal.atomic_checkpoint().expect("atomic_checkpoint failed");
+    drop(wal);
+
+    //now we simulate a crash during the atomic checkpoint by writing the meta file to half ones and half zeros
+    //and the log file to a non empty state
+    std::fs::write(temp_path.join("wal.meta"), [1u8; 16].iter().chain([0u8; 16].iter()).cloned().collect::<Vec<u8>>()).expect("failed to write wal.meta");
+    std::fs::write(temp_path.join("wal.log"), [49u8, 50u8, 51u8, 52u8]).expect("failed to write wal.log");
+
+    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    health_check(temp_path);
+    // Check if the content matches one of the checkpoints
+    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    let data = wal.read(4).expect("read failed");
+    assert!(data == vec![41, 42, 43, 44] || data == vec![45, 46, 47, 48], "data should match one of the checkpoints");
+}
+
+
