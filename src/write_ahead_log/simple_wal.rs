@@ -224,6 +224,11 @@ impl WriteAheadLog for SimpleWal {
     }
 
     fn atomic_checkpoint(&mut self){
+        // save the currrent seek position of the operational file
+        let current_seek_pos = self.get_current_operational_file()
+            .stream_position()
+            .expect("Failed to get current seek position");
+        // 1. The current operational file in wal.meta is switched to the fallback
         let mut operational_file_indicator = [0u8; 32];
         self.meta_file
             .seek(std::io::SeekFrom::Start(0))
@@ -247,7 +252,7 @@ impl WriteAheadLog for SimpleWal {
         self.meta_file
             .sync_all()
             .expect("Failed to sync meta file");
-
+        // 2. Iterate over the log file and apply all log entries to the new operational file
         self.log_file
             .seek(std::io::SeekFrom::Start(0))
             .expect("Failed to seek in log file");
@@ -272,6 +277,7 @@ impl WriteAheadLog for SimpleWal {
         self.get_current_operational_file()
             .sync_all()
             .expect("Failed to sync operational file");
+        // 3. Erase all log entries in the log file
         self.log_file
             .seek(SeekFrom::Start(0))
             .expect("Failed to seek in log file");
@@ -281,6 +287,10 @@ impl WriteAheadLog for SimpleWal {
         self.log_file
             .sync_all()
             .expect("Failed to sync log file");
+        // Restore the seek position of the operational file
+        self.get_current_operational_file()
+            .seek(SeekFrom::Start(current_seek_pos))
+            .expect("Failed to restore seek position in operational file");
     }
 }
 

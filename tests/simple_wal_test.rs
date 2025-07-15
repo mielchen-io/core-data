@@ -1,5 +1,8 @@
 use core_data::write_ahead_log::{simple_wal::SimpleWal, write_ahead_log::WriteAheadLog};
+use rand::SeedableRng;
 use std::{io::SeekFrom, path::Path};
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Seek, Write};
 
 fn _print_all_file_content(temp_path: &Path){
     let tick_content = std::fs::read(temp_path.join("wal.tick")).expect("failed to read wal.tick");
@@ -215,3 +218,112 @@ fn test_recovery_type_b() {
 }
 
 
+//a function that is testing every operation by repeatedly writing and reading data between checkpoints while keeping a pseudo file in memory for comparison
+#[test]
+fn test_all_operations() {
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let temp_path = temp_dir.path();
+    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+
+    let comp_file_path = temp_path.join("comp.test");
+    let mut comp_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&comp_file_path)
+        .expect("failed to create comp.test");
+
+    let seed: [u8; 32] = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32,
+    ];
+
+    let mut rng = rand::rngs::StdRng::from_seed(seed);
+
+    for _ in 0..100 {
+        for _ in 0..10 {
+            let operation = rand::Rng::random_range(&mut rng, 0..7);
+            match operation {
+                0 => {
+                    // Write
+                    let data: Vec<u8> = (0..10).map(|_| rand::Rng::random_range(&mut rng, 0..255)).collect();
+                    wal.write(data.clone());
+                    comp_file.write_all(&data).expect("write failed");
+                }
+                1 => {
+                    // Read
+                    let wal_size = wal.stream_len().expect("stream_len failed");
+                    let mut wal_stream_pos = wal.stream_position().expect("stream_position failed");
+                    if wal_stream_pos >= wal_size {
+                        //seek to the beginning of the file
+                        wal.seek(SeekFrom::Start(0)).expect("seek failed");
+                        comp_file.seek(SeekFrom::Start(0)).expect("seek failed");
+                        wal_stream_pos = 0;
+                    }
+                    let max_read_size = wal_size - wal_stream_pos;
+                    let percentage: f64 = rand::Rng::random_range(&mut rng, 0.0..100.0);
+                    let size = ((percentage as u64) * max_read_size) / 100;
+                    let data = wal.read(size).expect(&format!("read failed, wal_size: {}, wal_stream_pos: {}, size: {}", wal_size, wal_stream_pos, size));
+                    let mut pseudo_data = vec![0u8; size as usize];
+                    comp_file.read_exact(&mut pseudo_data).expect("read failed");
+                    assert_eq!(data, pseudo_data, "data should match comp.test data");
+                }
+                2 => {
+                    // Seek
+                    let comp_file_len = comp_file.metadata().expect("metadata failed").len();
+                    let pos = rand::Rng::random_range(&mut rng, 0..=comp_file_len);
+                    wal.seek(SeekFrom::Start(pos)).expect("seek failed");
+                    comp_file.seek(SeekFrom::Start(pos)).expect("seek failed");
+                    let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
+                    assert_eq!(wal.stream_position().expect("stream_position failed"), comp_file_seek_pos, "stream_position should match comp.test seek position");
+                }
+                3 => {
+                    // StreamLen
+                    let len = wal.stream_len().expect("stream_len failed");
+                    let comp_file_len = comp_file.metadata().expect("metadata failed").len();
+                    assert_eq!(len, comp_file_len, "stream_len should match comp.test length");
+                }
+                4 => {
+                    // StreamPosition
+                    let pos = wal.stream_position().expect("stream_position failed");
+                    let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
+                    assert_eq!(pos, comp_file_seek_pos, "stream_position should match comp.test position");
+                }
+                5 => {
+                    // AtomicCheckpoint
+                    wal.atomic_checkpoint();
+
+                    health_check(temp_path);
+                    let file_content = std::fs::read(temp_path.join("wal.tick")).expect("failed to read wal.tick");
+                    let mut comp_content = Vec::new();
+                    let mut comp_file_check = File::open(&comp_file_path).expect("failed to open comp.test");
+                    comp_file_check.read_to_end(&mut comp_content).expect("failed to read comp.test");
+                    assert_eq!(file_content, comp_content, "wal.tick should match comp.test content after atomic checkpoint");
+                    //check if the stream positions and lengths are still equal
+                    let wal_stream_pos = wal.stream_position().expect("stream_position failed");
+                    let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
+                    assert_eq!(wal_stream_pos, comp_file_seek_pos, "stream_position should match comp.test position after atomic checkpoint");
+                    let wal_len = wal.stream_len().expect("stream_len failed");
+                    let comp_file_len = comp_file.metadata().expect("metadata failed").len();
+                    assert_eq!(wal_len, comp_file_len, "stream_len should match comp.test length after atomic checkpoint");
+                }
+                6 => {
+                    // SetLen
+                    let comp_file_len = comp_file.metadata().expect("metadata failed").len();
+                    let new_len = rand::Rng::random_range(&mut rng, 0..=comp_file_len);
+                    wal.set_len(new_len);
+                    comp_file.set_len(new_len).expect("set_len failed");
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+    wal.atomic_checkpoint();
+    health_check(temp_path);
+    let file_content = std::fs::read(temp_path.join("wal.tick")).expect("failed to read wal.tick");
+    let mut comp_content = Vec::new();
+    let mut comp_file_check = File::open(&comp_file_path).expect("failed to open comp.test");
+    comp_file_check.read_to_end(&mut comp_content).expect("failed to read comp.test");
+    assert_eq!(file_content, comp_content, "wal.tick should match comp.test content after all operations");
+}
