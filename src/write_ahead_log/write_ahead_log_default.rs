@@ -23,10 +23,10 @@ use std::{fs::File, io::{Read, Seek, SeekFrom, Write}, path::PathBuf};
 use crate::write_ahead_log::write_ahead_log::WriteAheadLog;
 
 pub struct WriteAheadLogDefault {
-    pub(crate) tick_file: std::fs::File,
-    pub(crate) tock_file: std::fs::File,
-    pub(crate) log_file: std::fs::File,
-    pub(crate) meta_file: std::fs::File,
+    pub(in crate::write_ahead_log) tick_file: std::fs::File,
+    pub(in crate::write_ahead_log) tock_file: std::fs::File,
+    pub(in crate::write_ahead_log) log_file: std::fs::File,
+    pub(in crate::write_ahead_log) meta_file: std::fs::File,
 }
 
 enum LogEntry{
