@@ -59,8 +59,8 @@ fn test_read() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![1, 2, 3, 4]);
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
 
     assert_eq!(data, vec![1, 2, 3, 4]);
 }
@@ -73,8 +73,8 @@ fn test_write() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![5, 6, 7, 8]);
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
 
     assert_eq!(data, vec![5, 6, 7, 8]);
 }
@@ -87,8 +87,8 @@ fn test_seek() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![9, 10, 11, 12]);
-    wal.seek(SeekFrom::Start(2)).expect("seek failed");
-    let data = wal.read(2).expect("read failed");
+    wal.seek(SeekFrom::Start(2));
+    let data = wal.read(2);
 
     assert_eq!(data, vec![11, 12]);
 }
@@ -101,7 +101,7 @@ fn test_stream_len() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![13, 14, 15, 16]);
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
 
     assert_eq!(len, 4);
 }
@@ -114,8 +114,8 @@ fn test_stream_position() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![17, 18, 19, 20]);
-    wal.seek(SeekFrom::Start(2)).expect("seek failed");
-    let pos = wal.stream_position().expect("stream_position failed");
+    wal.seek(SeekFrom::Start(2));
+    let pos = wal.stream_position();
 
     assert_eq!(pos, 2);
 }
@@ -128,8 +128,8 @@ fn test_atomic_checkpoint() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![21, 22, 23, 24]);
     wal.atomic_checkpoint();
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
 
     assert_eq!(data, vec![21, 22, 23, 24]);
 }
@@ -142,19 +142,19 @@ fn test_set_len() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![25, 26, 27, 28]);
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
     assert_eq!(len, 4);
     wal.set_len(3);
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
     assert_eq!(len, 3);
     wal.atomic_checkpoint();
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
     assert_eq!(len, 3);
     wal.set_len(2);
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
     assert_eq!(len, 2);
     wal.atomic_checkpoint();
-    let len = wal.stream_len().expect("stream_len failed");
+    let len = wal.stream_len();
     assert_eq!(len, 2);
 }
 
@@ -167,8 +167,8 @@ fn test_open_wal_at_directory() {
     wal.atomic_checkpoint();
     drop(wal);
     let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
     assert_eq!(data, vec![29, 30, 31, 32]);
 }
 
@@ -179,7 +179,7 @@ fn test_recovery_type_a() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![33, 34, 35, 36]);
     wal.atomic_checkpoint();
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    wal.seek(SeekFrom::Start(0));
     wal.write(vec![37, 38, 39, 40]);
 
     // Simulate a crash by dropping the wal before the atomic checkpoint wich results in a non empty log file and a recovery type A
@@ -187,8 +187,8 @@ fn test_recovery_type_a() {
     let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
     health_check(temp_path);
     // Check if the content matches the checkpoint
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
     assert_eq!(data, vec![33, 34, 35, 36]);
 }
 
@@ -199,7 +199,7 @@ fn test_recovery_type_b() {
     let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![41, 42, 43, 44]);
     wal.atomic_checkpoint();
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
+    wal.seek(SeekFrom::Start(0));
     wal.write(vec![45, 46, 47, 48]);
     wal.atomic_checkpoint();
     drop(wal);
@@ -212,8 +212,8 @@ fn test_recovery_type_b() {
     let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
     health_check(temp_path);
     // Check if the content matches one of the checkpoints
-    wal.seek(SeekFrom::Start(0)).expect("seek failed");
-    let data = wal.read(4).expect("read failed");
+    wal.seek(SeekFrom::Start(0));
+    let data = wal.read(4);
     assert!(data == vec![41, 42, 43, 44] || data == vec![45, 46, 47, 48], "data should match one of the checkpoints");
 }
 
@@ -253,18 +253,18 @@ fn test_all_operations() {
                 }
                 1 => {
                     // Read
-                    let wal_size = wal.stream_len().expect("stream_len failed");
-                    let mut wal_stream_pos = wal.stream_position().expect("stream_position failed");
+                    let wal_size = wal.stream_len();
+                    let mut wal_stream_pos = wal.stream_position();
                     if wal_stream_pos >= wal_size {
                         //seek to the beginning of the file
-                        wal.seek(SeekFrom::Start(0)).expect("seek failed");
+                        wal.seek(SeekFrom::Start(0));
                         comp_file.seek(SeekFrom::Start(0)).expect("seek failed");
                         wal_stream_pos = 0;
                     }
                     let max_read_size = wal_size - wal_stream_pos;
                     let percentage: f64 = rand::Rng::random_range(&mut rng, 0.0..100.0);
                     let size = ((percentage as u64) * max_read_size) / 100;
-                    let data = wal.read(size).expect(&format!("read failed, wal_size: {}, wal_stream_pos: {}, size: {}", wal_size, wal_stream_pos, size));
+                    let data = wal.read(size);
                     let mut pseudo_data = vec![0u8; size as usize];
                     comp_file.read_exact(&mut pseudo_data).expect("read failed");
                     assert_eq!(data, pseudo_data, "data should match comp.test data");
@@ -273,20 +273,20 @@ fn test_all_operations() {
                     // Seek
                     let comp_file_len = comp_file.metadata().expect("metadata failed").len();
                     let pos = rand::Rng::random_range(&mut rng, 0..=comp_file_len);
-                    wal.seek(SeekFrom::Start(pos)).expect("seek failed");
+                    wal.seek(SeekFrom::Start(pos));
                     comp_file.seek(SeekFrom::Start(pos)).expect("seek failed");
                     let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
-                    assert_eq!(wal.stream_position().expect("stream_position failed"), comp_file_seek_pos, "stream_position should match comp.test seek position");
+                    assert_eq!(wal.stream_position(), comp_file_seek_pos, "stream_position should match comp.test seek position");
                 }
                 3 => {
                     // StreamLen
-                    let len = wal.stream_len().expect("stream_len failed");
+                    let len = wal.stream_len();
                     let comp_file_len = comp_file.metadata().expect("metadata failed").len();
                     assert_eq!(len, comp_file_len, "stream_len should match comp.test length");
                 }
                 4 => {
                     // StreamPosition
-                    let pos = wal.stream_position().expect("stream_position failed");
+                    let pos = wal.stream_position();
                     let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
                     assert_eq!(pos, comp_file_seek_pos, "stream_position should match comp.test position");
                 }
@@ -301,10 +301,10 @@ fn test_all_operations() {
                     comp_file_check.read_to_end(&mut comp_content).expect("failed to read comp.test");
                     assert_eq!(file_content, comp_content, "wal.tick should match comp.test content after atomic checkpoint");
                     //check if the stream positions and lengths are still equal
-                    let wal_stream_pos = wal.stream_position().expect("stream_position failed");
+                    let wal_stream_pos = wal.stream_position();
                     let comp_file_seek_pos = comp_file.stream_position().expect("stream_position failed");
                     assert_eq!(wal_stream_pos, comp_file_seek_pos, "stream_position should match comp.test position after atomic checkpoint");
-                    let wal_len = wal.stream_len().expect("stream_len failed");
+                    let wal_len = wal.stream_len();
                     let comp_file_len = comp_file.metadata().expect("metadata failed").len();
                     assert_eq!(wal_len, comp_file_len, "stream_len should match comp.test length after atomic checkpoint");
                 }

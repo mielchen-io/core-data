@@ -162,11 +162,11 @@ impl SimpleWal {
 }
 
 impl WriteAheadLog for SimpleWal {
-    fn read(&mut self, size: u64) -> Result<Vec<u8>, std::io::Error> {
+    fn read(&mut self, size: u64) -> Vec<u8> {
         let mut buffer = vec![0u8; size as usize];
         self.get_current_operational_file()
-            .read_exact(&mut buffer)?;
-        Ok(buffer)
+            .read_exact(&mut buffer).expect("Failed to read data from operational file during a WAL read operation");
+        buffer
     }
 
     fn write(&mut self, buf: Vec<u8>){
@@ -188,23 +188,25 @@ impl WriteAheadLog for SimpleWal {
             .expect("Failed to sync operational file");
     }
 
-    fn seek(&mut self, pos: std::io::SeekFrom) -> Result<(), std::io::Error> {
+    fn seek(&mut self, pos: std::io::SeekFrom){
         self.get_current_operational_file()
-            .seek(pos)?;
-        Ok(())
+            .seek(pos)
+            .expect("Failed to seek in operational file during a WAL seek operation");
     }
 
-    fn stream_len(&mut self) -> Result<u64, std::io::Error> {
+    fn stream_len(&mut self) -> u64{
         let len = self.get_current_operational_file()
-            .metadata()?
+            .metadata()
+            .expect("Failed to get metadata of operational file during a WAL stream_len operation")
             .len();
-        Ok(len)
+        return len;
     }
 
-    fn stream_position(&mut self) -> Result<u64, std::io::Error> {
+    fn stream_position(&mut self) -> u64{
         let pos = self.get_current_operational_file()
-            .stream_position()?;
-        Ok(pos)
+            .stream_position()
+            .expect("Failed to get stream position of operational file during a WAL stream_position operation");
+        return pos;
     }
 
     fn set_len(&mut self, size: u64){
