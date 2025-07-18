@@ -1,4 +1,4 @@
-use core_data::write_ahead_log::{write_ahead_log_default::WriteAheadLogDefault, write_ahead_log::WriteAheadLog};
+use core_data::write_ahead_log::{wal_default::WriteAheadLogDefault, wal_trait::WriteAheadLog};
 use rand::SeedableRng;
 use std::{io::SeekFrom, path::Path};
 use std::fs::{File, OpenOptions};

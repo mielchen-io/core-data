@@ -1,6 +1,6 @@
 use std::{fs::File, io::{self, Read, Seek, SeekFrom, Write}, path::PathBuf};
 
-use crate::write_ahead_log::write_ahead_log_default::WriteAheadLogDefault;
+use crate::write_ahead_log::{wal_default_file_io::open_file_with_permissions, wal_default::WriteAheadLogDefault};
 
 impl WriteAheadLogDefault {
 
@@ -102,10 +102,3 @@ impl WriteAheadLogDefault {
    
 }
 
-fn open_file_with_permissions(path: &PathBuf) -> std::fs::File {
-    std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)
-        .expect("Failed to open one of the WAL files")
-}
