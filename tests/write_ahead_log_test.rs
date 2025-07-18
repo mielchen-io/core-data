@@ -1,4 +1,4 @@
-use core_data::write_ahead_log::{simple_wal::SimpleWal, write_ahead_log::WriteAheadLog};
+use core_data::write_ahead_log::{write_ahead_log_default::WriteAheadLogDefault, write_ahead_log::WriteAheadLog};
 use rand::SeedableRng;
 use std::{io::SeekFrom, path::Path};
 use std::fs::{File, OpenOptions};
@@ -33,7 +33,7 @@ fn health_check(temp_path: &Path) {
 fn test_new_wal_at_directory() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
-    let _ = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let _ = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
     assert!(temp_path.join("wal.tick").exists());
     assert!(temp_path.join("wal.tock").exists());
     assert!(temp_path.join("wal.log").exists());
@@ -56,7 +56,7 @@ fn test_read() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![1, 2, 3, 4]);
     wal.seek(SeekFrom::Start(0));
@@ -70,7 +70,7 @@ fn test_write() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![5, 6, 7, 8]);
     wal.seek(SeekFrom::Start(0));
@@ -84,7 +84,7 @@ fn test_seek() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![9, 10, 11, 12]);
     wal.seek(SeekFrom::Start(2));
@@ -98,7 +98,7 @@ fn test_stream_len() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![13, 14, 15, 16]);
     let len = wal.stream_len();
@@ -111,7 +111,7 @@ fn test_stream_position() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![17, 18, 19, 20]);
     wal.seek(SeekFrom::Start(2));
@@ -125,7 +125,7 @@ fn test_atomic_checkpoint() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![21, 22, 23, 24]);
     wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0));
@@ -139,7 +139,7 @@ fn test_set_len() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
 
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     wal.write(vec![25, 26, 27, 28]);
     let len = wal.stream_len();
@@ -162,11 +162,11 @@ fn test_set_len() {
 fn test_open_wal_at_directory() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![29, 30, 31, 32]);
     wal.atomic_checkpoint();
     drop(wal);
-    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::open_wal_at_directory(temp_path.to_path_buf());
     wal.seek(SeekFrom::Start(0));
     let data = wal.read(4);
     assert_eq!(data, vec![29, 30, 31, 32]);
@@ -176,7 +176,7 @@ fn test_open_wal_at_directory() {
 fn test_recovery_type_a() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![33, 34, 35, 36]);
     wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0));
@@ -184,7 +184,7 @@ fn test_recovery_type_a() {
 
     // Simulate a crash by dropping the wal before the atomic checkpoint wich results in a non empty log file and a recovery type A
     drop(wal);
-    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::open_wal_at_directory(temp_path.to_path_buf());
     health_check(temp_path);
     // Check if the content matches the checkpoint
     wal.seek(SeekFrom::Start(0));
@@ -196,7 +196,7 @@ fn test_recovery_type_a() {
 fn test_recovery_type_b() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
     wal.write(vec![41, 42, 43, 44]);
     wal.atomic_checkpoint();
     wal.seek(SeekFrom::Start(0));
@@ -209,7 +209,7 @@ fn test_recovery_type_b() {
     std::fs::write(temp_path.join("wal.meta"), [1u8; 16].iter().chain([0u8; 16].iter()).cloned().collect::<Vec<u8>>()).expect("failed to write wal.meta");
     std::fs::write(temp_path.join("wal.log"), [49u8, 50u8, 51u8, 52u8]).expect("failed to write wal.log");
 
-    let mut wal = SimpleWal::open_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::open_wal_at_directory(temp_path.to_path_buf());
     health_check(temp_path);
     // Check if the content matches one of the checkpoints
     wal.seek(SeekFrom::Start(0));
@@ -223,7 +223,7 @@ fn test_recovery_type_b() {
 fn test_all_operations() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     let temp_path = temp_dir.path();
-    let mut wal = SimpleWal::new_wal_at_directory(temp_path.to_path_buf());
+    let mut wal = WriteAheadLogDefault::new_wal_at_directory(temp_path.to_path_buf());
 
     let comp_file_path = temp_path.join("comp.test");
     let mut comp_file = OpenOptions::new()

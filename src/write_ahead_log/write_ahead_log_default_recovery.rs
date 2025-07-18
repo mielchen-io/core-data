@@ -1,8 +1,8 @@
 use std::{fs::File, io::{self, Read, Seek, SeekFrom, Write}, path::PathBuf};
 
-use crate::write_ahead_log::simple_wal::SimpleWal;
+use crate::write_ahead_log::write_ahead_log_default::WriteAheadLogDefault;
 
-impl SimpleWal {
+impl WriteAheadLogDefault {
 
     
     /// Opens an existing WAL at the specified directory.

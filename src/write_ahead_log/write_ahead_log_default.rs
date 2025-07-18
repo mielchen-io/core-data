@@ -22,7 +22,7 @@ use std::{fs::File, io::{Read, Seek, SeekFrom, Write}, path::PathBuf};
 
 use crate::write_ahead_log::write_ahead_log::WriteAheadLog;
 
-pub struct SimpleWal {
+pub struct WriteAheadLogDefault {
     pub(crate) tick_file: std::fs::File,
     pub(crate) tock_file: std::fs::File,
     pub(crate) log_file: std::fs::File,
@@ -45,7 +45,7 @@ impl LogEntry {
     
 }
 
-impl SimpleWal {
+impl WriteAheadLogDefault {
 
     pub fn new_wal_at_directory(dir_path: PathBuf) -> Self {
         assert!(dir_path.exists(), "Directory does not exist: {:?}", dir_path);
@@ -161,7 +161,7 @@ impl SimpleWal {
     }
 }
 
-impl WriteAheadLog for SimpleWal {
+impl WriteAheadLog for WriteAheadLogDefault {
     fn read(&mut self, size: u64) -> Vec<u8> {
         let mut buffer = vec![0u8; size as usize];
         self.get_current_operational_file()
